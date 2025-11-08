@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ingredient Management System - IMS</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Login Page -->
+    <div id="loginPage" class="login-page active">
+        <div class="login-container">
+            <div class="login-card">
+                <div class="login-header">
+                    <h1>🍳 IMS</h1>
+                    <p>Ingredient Management System</p>
+                </div>
+
+                <!-- Login Form -->
+                <form id="loginForm" class="login-form">
+                    <div class="form-group">
+                        <label for="username">Username or Email</label>
+                        <input type="text" id="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" required>
+                    </div>
+                    <button type="submit" class="btn-primary btn-login">Login</button>
+                </form>
+
+                <!-- Signup Form (Hidden by default) -->
+                <form id="signupForm" class="login-form" style="display: none;">
+                    <div class="form-group">
+                        <label for="signupName">Full Name</label>
+                        <input type="text" id="signupName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="signupEmail">Email</label>
+                        <input type="email" id="signupEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="signupDepartment">Department</label>
+                        <select id="signupDepartment" required>
+                            <option value="">Select Department</option>
+                            <option value="Culinary Arts">Culinary Arts</option>
+                            <option value="Baking">Baking</option>
+                            <option value="Pastry">Pastry</option>
+                            <option value="Food Service">Food Service</option>
+                            <option value="Nutrition">Nutrition</option>
+                            <option value="Stores">Stores</option>
+                            <option value="Administration">Administration</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="signupRole">Role</label>
+                        <select id="signupRole" required>
+                            <option value="">Select Role</option>
+                            <option value="training_assistant">Training Assistant</option>
+                            <option value="lecturer">Lecturer</option>
+                            <option value="lecturer_incharge">Lecturer in Charge</option>
+                            <option value="stores">Stores Manager</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="signupPassword">Password</label>
+                        <input type="password" id="signupPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="signupConfirmPassword">Confirm Password</label>
+                        <input type="password" id="signupConfirmPassword" required>
+                    </div>
+                    <button type="submit" class="btn-primary btn-login">Create Account</button>
+                </form>
+
+                <div style="text-align: center; margin: 20px 0; font-size: 14px;">
+                    <span id="loginToggleText">Don't have an account? <a href="#" onclick="toggleSignupForm(event)" style="color: var(--accent-vibrant); text-decoration: none; font-weight: 600;">Sign Up</a></span>
+                    <span id="signupToggleText" style="display: none;">Already have an account? <a href="#" onclick="toggleLoginForm(event)" style="color: var(--accent-vibrant); text-decoration: none; font-weight: 600;">Login</a></span>
+                </div>
+
+                <div class="login-divider">Demo Users</div>
+
+                <div class="demo-users">
+                    <button type="button" class="demo-btn" onclick="loginAsRole('training_assistant')">
+                        <strong>Training Assistant</strong>
+                    </button>
+                    <button type="button" class="demo-btn" onclick="loginAsRole('lecturer')">
+                        <strong>Lecturer</strong>
+                    </button>
+                    <button type="button" class="demo-btn" onclick="loginAsRole('lecturer_incharge')">
+                        <strong>Lecturer in Charge</strong>
+                    </button>
+                    <button type="button" class="demo-btn" onclick="loginAsRole('hod')">
+                        <strong>HOD</strong>
+                    </button>
+                    <button type="button" class="demo-btn" onclick="loginAsRole('stores')">
+                        <strong>Stores</strong>
+                    </button>
+                    <button type="button" class="demo-btn" onclick="loginAsRole('admin')">
+                        <strong>Admin</strong>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="mainApp" class="main-app">
+        <div class="container">
+            <!-- Sidebar Navigation -->
+            <aside class="sidebar">
+                <div class="logo">
+                    <h1>🍳 IMS</h1>
+                    <p id="roleDisplay">Admin</p>
+                </div>
+
+                <div class="user-info">
+                    <div class="user-avatar" id="userAvatar">A</div>
+                    <div class="user-details">
+                        <p id="userName">Admin User</p>
+                        <p id="userRole">Administrator</p>
+                    </div>
+                </div>
+
+                <nav class="nav-menu" id="navMenu">
+                    <!-- Navigation items will be dynamically added based on role -->
+                </nav>
+
+                <button class="btn-logout" onclick="logout()">🚪 Logout</button>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="main-content">
+                <!-- Dashboard Section -->
+                <section id="dashboard" class="section active">
+                    <div class="section-header">
+                        <h2>Dashboard</h2>
+                    </div>
+                    <div class="dashboard-grid" id="dashboardGrid">
+                        <!-- Dashboard stats will be added here -->
+                    </div>
+                </section>
+
+                <!-- Ingredients Section -->
+                <section id="ingredients" class="section">
+                    <div class="section-header">
+                        <h2>Ingredient Inventory</h2>
+                        <button class="btn-primary" id="openIngredientModal">+ Add Ingredient</button>
+                    </div>
+
+                    <div class="search-filter">
+                        <input type="text" id="ingredientSearch" placeholder="Search ingredients..." class="search-input">
+                        <select id="categoryFilter" class="filter-select">
+                            <option value="">All Categories</option>
+                            <option value="vegetables">Vegetables</option>
+                            <option value="fruits">Fruits</option>
+                            <option value="dairy">Dairy</option>
+                            <option value="proteins">Proteins</option>
+                            <option value="grains">Grains</option>
+                            <option value="spices">Spices</option>
+                            <option value="oils">Oils</option>
+                            <option value="condiments">Condiments</option>
+                            <option value="beverage">Beverages</option>
+                        </select>
+                        <select id="approvalFilter" class="filter-select" style="display: none;">
+                            <option value="">All Status</option>
+                            <option value="pending">Pending Approval</option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                    </div>
+
+                    <div class="ingredients-grid" id="ingredientsGrid">
+                        <!-- Ingredients will be added here -->
+                    </div>
+                </section>
+
+                <!-- Recipes Section -->
+                <section id="recipes" class="section">
+                    <div class="section-header">
+                        <h2>My Recipes</h2>
+                        <button class="btn-primary" id="openRecipeModal">+ Create Recipe</button>
+                    </div>
+
+                    <div class="search-filter">
+                        <input type="text" id="recipeSearch" placeholder="Search recipes..." class="search-input">
+                        <select id="recipeCourseFilter" class="filter-select">
+                            <option value="">All Courses</option>
+                            <option value="appetizer">🥒 Appetizers</option>
+                            <option value="main">🍽️ Main Courses</option>
+                            <option value="side">🥗 Side Dishes</option>
+                            <option value="dessert">🍰 Desserts</option>
+                            <option value="confectionery">🍫 Confectionery</option>
+                            <option value="cocktail">🍹 Beverages</option>
+                        </select>
+                        <select id="recipeApprovalFilter" class="filter-select" style="display: none;">
+                            <option value="">All Status</option>
+                            <option value="pending">Pending Approval</option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                    </div>
+
+                    <div class="recipes-grid" id="recipesGrid">
+                        <!-- Recipes will be added here -->
+                    </div>
+                </section>
+
+                <!-- Approvals Section -->
+                <section id="approvals" class="section">
+                    <div class="section-header">
+                        <h2>Pending Approvals</h2>
+                    </div>
+
+                    <div class="approvals-container">
+                        <div id="approvalsContent">
+                            <!-- Pending items for approval -->
+                        </div>
+                    </div>
+                </section>
+
+                <!-- User Management Section (Admin Only) -->
+                <section id="users" class="section">
+                    <div class="section-header">
+                        <h2>User Management</h2>
+                        <button class="btn-primary" id="openUserModal">+ Add User</button>
+                    </div>
+
+                    <div class="users-grid" id="usersGrid">
+                        <!-- Users will be added here -->
+                    </div>
+                </section>
+
+                <!-- Reports Section (HOD Only) -->
+                <section id="reports" class="section">
+                    <div class="section-header">
+                        <h2>Department Reports</h2>
+                    </div>
+
+                    <div class="reports-container" id="reportsContainer">
+                        <!-- Reports will be added here -->
+                    </div>
+                </section>
+
+                <!-- Orders Section (Stores Only) -->
+                <section id="orders" class="section">
+                    <div class="section-header">
+                        <h2>Approved Orders</h2>
+                    </div>
+
+                    <div class="orders-container" id="ordersContainer">
+                        <!-- Approved orders will be added here -->
+                    </div>
+                </section>
+
+                <!-- Issued Section (Stores Only) -->
+                <section id="issued" class="section">
+                    <div class="section-header">
+                        <h2>Issued Requisitions</h2>
+                    </div>
+
+                    <div class="issued-container" id="issuedContainer">
+                        <!-- Issued orders will be added here -->
+                    </div>
+                </section>
+
+                <!-- Store Inventory Section (Stores Only) -->
+                <section id="store_inventory" class="section">
+                    <div class="section-header">
+                        <h2>📊 Store Inventory</h2>
+                        <p style="font-size: 14px; color: var(--text-secondary); margin-top: 5px;">Track stock levels and manage purchase orders</p>
+                    </div>
+
+                    <div class="store-inventory-container" id="storeInventoryContainer">
+                        <!-- Store inventory will be added here -->
+                    </div>
+                </section>
+
+                <!-- My Orders Section (Lecturer) -->
+                <section id="my_orders" class="section">
+                    <div class="section-header">
+                        <h2>My Requisitions</h2>
+                    </div>
+
+                    <div class="orders-container" id="myOrdersContainer">
+                        <!-- My orders will be added here -->
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- Ingredient Modal -->
+    <div id="ingredientModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Ingredient</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <form id="ingredientForm">
+                <div class="form-group">
+                    <label for="ingredientName">Name</label>
+                    <input type="text" id="ingredientName" list="ingredientList" placeholder="Type ingredient name or select from list..." required>
+                    <datalist id="ingredientList">
+                        <!-- Options populated by JavaScript -->
+                    </datalist>
+                </div>
+                <div class="form-group">
+                    <label for="ingredientCategory">Category</label>
+                    <select id="ingredientCategory" required>
+                        <option value="">Select Category</option>
+                        <option value="vegetables">Vegetables</option>
+                        <option value="fruits">Fruits</option>
+                        <option value="dairy">Dairy</option>
+                        <option value="proteins">Proteins</option>
+                        <option value="grains">Grains</option>
+                        <option value="spices">Spices</option>
+                        <option value="oils">Oils</option>
+                        <option value="condiments">Condiments</option>
+                        <option value="beverage">Beverages</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="ingredientQuantity">Quantity</label>
+                    <input type="number" id="ingredientQuantity" min="0" step="0.1" required>
+                </div>
+                <div class="form-group">
+                    <label for="ingredientUnit">Unit</label>
+                    <select id="ingredientUnit" required>
+                        <option value="kg">Kg</option>
+                        <option value="g">Grams</option>
+                        <option value="l">Liters</option>
+                        <option value="ml">ML</option>
+                        <option value="cup">Cup</option>
+                        <option value="tbsp">Tbsp</option>
+                        <option value="tsp">Tsp</option>
+                        <option value="each">each</option>
+                    </select>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="cancelIngredient">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Ingredient</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Recipe Modal -->
+    <div id="recipeModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>Create Recipe</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <form id="recipeForm">
+                <div class="form-group">
+                    <label for="recipeName">Recipe Name</label>
+                    <input type="text" id="recipeName" required>
+                </div>
+                <div class="form-group">
+                    <label for="recipeServings">Base Servings</label>
+                    <input type="number" id="recipeServings" min="1" required>
+                </div>
+                
+                <div style="margin: 20px 0;">
+                    <label style="display: block; margin-bottom: 10px; font-weight: 600;">Ingredients</label>
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 200px;">
+                            <label style="display: block; font-size: 13px; margin-bottom: 5px;">Ingredient</label>
+                            <input type="text" id="recipeIngredient" list="recipeIngredientList" placeholder="Type ingredient name or select from list..." style="width: 100%; padding: 8px; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; background: rgba(255,255,255,0.05); color: inherit;">
+                            <datalist id="recipeIngredientList">
+                                <!-- Options populated by JavaScript -->
+                            </datalist>
+                        </div>
+                        <div style="flex: 0 0 120px;">
+                            <label style="display: block; font-size: 13px; margin-bottom: 5px;">Quantity</label>
+                            <input type="number" id="recipeQuantity" min="0" step="0.1" placeholder="0" style="width: 100%; padding: 8px; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; background: rgba(255,255,255,0.05); color: inherit;">
+                        </div>
+                        <div style="flex: 0 0 100px;">
+                            <label style="display: block; font-size: 13px; margin-bottom: 5px;">Unit</label>
+                            <select id="recipeUnit" style="width: 100%; padding: 8px; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; background: rgba(255,255,255,0.05); color: #ffffff;">
+                                <option value="kg">Kg</option>
+                                <option value="g">g</option>
+                                <option value="l">ltrs</option>
+                                <option value="ml">ml</option>
+                                <option value="cup">Cup</option>
+                                <option value="tbsp">tblspn</option>
+                                <option value="tsp">Tsp</option>
+                                <option value="each">each</option>
+                            </select>
+                        </div>
+                        <div style="flex: 0 0 100px; display: flex; align-items: flex-end;">
+                            <button type="button" id="addIngredientBtn" style="width: 100%; padding: 8px; background: var(--accent-vibrant); border: none; border-radius: 4px; color: var(--bg-primary); font-weight: 600; cursor: pointer; transition: all 0.3s;">+ Add</button>
+                        </div>
+                    </div>
+                    
+                    <table id="recipeIngredientsTable" style="width: 100%; border-collapse: collapse; margin-top: 10px; background: rgba(255,255,255,0.02); border-radius: 8px; overflow: hidden;">
+                        <thead style="background: rgba(0,255,200,0.1); border-bottom: 2px solid rgba(0,255,200,0.3);">
+                            <tr>
+                                <th style="padding: 12px; text-align: left; border-right: 1px solid rgba(255,255,255,0.1);">Ingredient</th>
+                                <th style="padding: 12px; text-align: center; width: 100px; border-right: 1px solid rgba(255,255,255,0.1);">Quantity</th>
+                                <th style="padding: 12px; text-align: center; width: 80px; border-right: 1px solid rgba(255,255,255,0.1);">Unit</th>
+                                <th style="padding: 12px; text-align: center; width: 80px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recipeIngredientsTableBody">
+                            <tr>
+                                <td colspan="4" style="padding: 20px; text-align: center; color: var(--text-secondary); font-size: 13px;">No ingredients added yet</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="cancelRecipe">Cancel</button>
+                    <button type="submit" class="btn-primary">Create Recipe</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- User Modal (Admin Only) -->
+    <div id="userModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add User</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <form id="userForm">
+                <div class="form-group">
+                    <label for="userName">Full Name</label>
+                    <input type="text" id="userName" required>
+                </div>
+                <div class="form-group">
+                    <label for="userEmail">Email</label>
+                    <input type="email" id="userEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="userRole">Role</label>
+                    <select id="userRole" required>
+                        <option value="">Select Role</option>
+                        <option value="admin">Admin</option>
+                        <option value="hod">HOD</option>
+                        <option value="lecturer_incharge">Lecturer in Charge</option>
+                        <option value="lecturer">Lecturer</option>
+                        <option value="training_assistant">Training Assistant</option>
+                        <option value="stores">Stores</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="userDepartment">Department</label>
+                    <input type="text" id="userDepartment">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="cancelUser">Cancel</button>
+                    <button type="submit" class="btn-primary">Add User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Recipe Details & Order Modal -->
+    <div id="orderModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3 id="orderModalTitle">📋 Order Ingredients for Lesson</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <form id="orderForm">
+                <input type="hidden" id="orderRecipeId">
+                
+                <!-- Recipe Details Section -->
+                <div style="background: rgba(0,255,200,0.08); border: 1px solid rgba(0,255,200,0.3); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                    <h3 id="orderRecipeName" style="color: var(--accent-vibrant); margin: 0 0 12px 0;"></h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 12px;">
+                        <div>
+                            <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">Base Servings</div>
+                            <div style="font-weight: 600; font-size: 16px;" id="orderBaseServings"></div>
+                        </div>
+                        <div>
+                            <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">Created by</div>
+                            <div style="font-weight: 600; font-size: 16px;" id="orderRecipeCreator"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">Ingredients</div>
+                        <div id="orderIngredientsPreview" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Order Details Section -->
+                <div class="form-group">
+                    <label for="orderStudentCount">👥 Number of Students to Train <span style="color: var(--accent-secondary); font-weight: 600;">*</span></label>
+                    <input type="number" id="orderStudentCount" min="1" required placeholder="Enter student count" oninput="calculateOrderQuantities()">
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">System will automatically calculate ingredient quantities</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="orderLessonDate">📅 Lesson Date <span style="color: var(--accent-secondary); font-weight: 600;">*</span></label>
+                    <input type="date" id="orderLessonDate" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="orderNotes">📝 Notes (Optional)</label>
+                    <textarea id="orderNotes" placeholder="Any special requirements..." style="width: 100%; padding: 10px; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; background: rgba(255,255,255,0.05); color: inherit; font-family: inherit; min-height: 80px;"></textarea>
+                </div>
+
+                <!-- Calculated Quantities Section -->
+                <div style="margin: 20px 0; background: rgba(0,255,200,0.05); border: 1px solid rgba(0,255,200,0.2); border-radius: 8px; padding: 16px;">
+                    <label style="display: block; margin-bottom: 15px; font-weight: 600; color: var(--accent-vibrant);">📊 Calculated Order Quantities</label>
+                    <div id="orderQuantitiesPreview" style="padding: 0;">
+                        <div style="color: var(--text-secondary); font-size: 13px; text-align: center; padding: 20px;">Enter student count to see calculated quantities</div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="cancelOrder">Cancel</button>
+                    <button type="submit" class="btn-primary">✅ Submit Order Requisition</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>
