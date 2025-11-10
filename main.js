@@ -24,7 +24,7 @@ const ROLES = {
     },
     training_assistant: {
         name: 'Training Assistant',
-        permissions: ['create', 'view'],
+        permissions: ['create', 'view', 'edit'],
         navItems: ['dashboard', 'ingredients', 'recipes']
     },
     stores: {
@@ -840,6 +840,58 @@ function deleteRecipe(id) {
         saveToLocalStorage();
         renderRecipes();
     }
+}
+
+function editRecipe(id) {
+    const recipe = recipes.find(rec => rec.id === id);
+    if (!recipe) return;
+
+    if (currentUser.role !== 'training_assistant') {
+        alert('You are not authorized to edit this recipe');
+        return;
+    }
+
+    document.getElementById('recipeForm').reset();
+    document.getElementById('recipeName').value = recipe.name;
+    document.getElementById('recipeServings').value = recipe.servings;
+    
+    selectedRecipeIngredients = [...recipe.ingredients];
+    renderRecipeIngredientsDisplay();
+    populateRecipeIngredientDatalist();
+
+    const form = document.getElementById('recipeForm');
+    const originalFormSubmit = form.onsubmit;
+    form.onsubmit = function(e) {
+        e.preventDefault();
+        updateRecipe(id);
+    };
+
+    document.getElementById('recipeModal').classList.add('active');
+}
+
+function updateRecipe(id) {
+    const name = document.getElementById('recipeName').value.trim();
+    const servings = parseInt(document.getElementById('recipeServings').value);
+
+    if (!name || selectedRecipeIngredients.length === 0) {
+        alert('Please enter a recipe name and add at least one ingredient');
+        return;
+    }
+
+    const recipeIndex = recipes.findIndex(rec => rec.id === id);
+    if (recipeIndex === -1) return;
+
+    const recipe = recipes[recipeIndex];
+    recipe.name = name;
+    recipe.ingredients = [...selectedRecipeIngredients];
+    recipe.servings = servings;
+
+    saveToLocalStorage();
+    renderRecipes();
+    closeRecipeModal();
+    
+    const form = document.getElementById('recipeForm');
+    form.onsubmit = addRecipe;
 }
 
 // ===== APPROVALS =====
@@ -2081,7 +2133,11 @@ function renderRecipes() {
                         <button class="btn-edit" onclick="approveRecipe(${rec.id}); return false;">✅ Approve</button>
                         <button class="btn-delete" onclick="rejectRecipe(${rec.id}); return false;">❌ Reject</button>
                     ` : ''}
-                    ${rec.createdBy === currentUser.name && rec.status === 'pending' ? `<button class="btn-delete" onclick="deleteRecipe(${rec.id}); return false;">🗑 Delete</button>` : ''}
+                    ${currentUser.role === 'training_assistant' ? `
+                        <button class="btn-edit" onclick="editRecipe(${rec.id}); return false;">✏️ Edit</button>
+                        <button class="btn-delete" onclick="deleteRecipe(${rec.id}); return false;">🗑 Delete</button>
+                    ` : ''}
+                    ${rec.createdBy === currentUser.name && rec.status === 'pending' && currentUser.role !== 'training_assistant' ? `<button class="btn-delete" onclick="deleteRecipe(${rec.id}); return false;">🗑 Delete</button>` : ''}
                 </div>
             </div>
         </div>
