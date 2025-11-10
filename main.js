@@ -564,9 +564,8 @@ function closeIngredientModal() {
 }
 
 function addIngredient() {
-    // Only allow training assistant to add ingredients
-    if (currentUser.role !== 'training_assistant') {
-        alert('Only Training Assistants can add ingredients');
+    if (currentUser.role !== 'training_assistant' && currentUser.role !== 'stores') {
+        alert('Only Training Assistants and Stores Managers can add ingredients');
         return;
     }
 
@@ -620,8 +619,7 @@ function renderIngredients() {
     // Show/hide add ingredient button based on user role
     const addIngredientBtn = document.getElementById('openIngredientModal');
     if (addIngredientBtn) {
-        // Keep add button visible for Training Assistants (existing behavior)
-        addIngredientBtn.style.display = currentUser.role === 'training_assistant' ? 'block' : 'none';
+        addIngredientBtn.style.display = (currentUser.role === 'training_assistant' || currentUser.role === 'stores') ? 'block' : 'none';
     }
 
     let filtered = ingredients.filter(ing => {
@@ -2452,6 +2450,7 @@ function renderStoreInventory() {
                         <div style="margin-top: 12px; display: flex; gap: 8px;">
                             <input type="number" min="1" value="10" class="restock-qty" style="width: 80px; padding: 6px; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; background: rgba(255,255,255,0.05); color: inherit;" placeholder="Qty">
                             <button class="btn-primary" onclick="createPurchaseOrder(${ing.id}, this)" style="flex: 1; padding: 8px;">📝 Create PO</button>
+                            <button class="btn-edit" onclick="editIngredientInventory(${ing.id})" style="padding: 8px;">✏️ Edit Stock</button>
                         </div>
                     </div>
                     `;
@@ -2492,6 +2491,7 @@ function renderStoreInventory() {
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 6px; margin-left: 10px;">
                                 <span class="stock-badge" style="background: #2ecc71; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; white-space: nowrap;">OK</span>
+                                <button class="btn-edit" onclick="editIngredientInventory(${ing.id})" style="padding: 6px 8px; font-size: 12px;">✏️ Edit</button>
                             </div>
                         </div>
                     </div>
@@ -2542,6 +2542,34 @@ function renderStoreInventory() {
     ` : '';
     
     container.innerHTML = lowStockHTML + normalStockHTML + poHTML;
+}
+
+function editIngredientInventory(ingredientId) {
+    if (currentUser.role !== 'stores') {
+        alert('Only Stores Managers can edit ingredient inventory');
+        return;
+    }
+
+    const ingredient = ingredients.find(i => i.id === ingredientId);
+    if (!ingredient) return;
+
+    const newQuantity = prompt(`Edit inventory for: ${ingredient.name}\n\nCurrent Stock: ${ingredient.quantity} ${ingredient.unit}\n\nEnter new quantity:`, ingredient.quantity);
+    
+    if (newQuantity === null) return;
+    
+    const quantity = parseFloat(newQuantity);
+    if (isNaN(quantity) || quantity < 0) {
+        alert('Please enter a valid quantity');
+        return;
+    }
+
+    const oldQuantity = ingredient.quantity;
+    ingredient.quantity = quantity;
+    
+    saveToLocalStorage();
+    renderStoreInventory();
+    
+    alert(`✅ Inventory Updated!\n\nIngredient: ${ingredient.name}\nOld Stock: ${oldQuantity} ${ingredient.unit}\nNew Stock: ${quantity} ${ingredient.unit}`);
 }
 
 function createPurchaseOrder(ingredientId, button) {
