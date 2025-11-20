@@ -9,7 +9,7 @@ const ROLES = {
     },
     hod: {
         name: 'Head of Department',
-        permissions: ['create', 'approve', 'view_reports'],
+        permissions: ['create', 'edit', 'approve', 'view_reports'],
         navItems: ['dashboard', 'ingredients', 'recipes', 'approvals', 'reports']
     },
     lecturer_incharge: {
@@ -188,6 +188,15 @@ const ingredientCatalog = [
 // ===== INITIALIZATION =====
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOMContentLoaded fired');
+    
+    // Check for data version to handle migrations
+    const savedVersion = localStorage.getItem('ims_version');
+    if (savedVersion !== '2.0') {
+        // Clear old data to force re-initialization with new schema
+        localStorage.removeItem('ims_recipes');
+        localStorage.setItem('ims_version', '2.0');
+    }
+    
     // Load any saved data from localStorage
     loadFromLocalStorage();
     
@@ -239,15 +248,6 @@ function toggleLoginForm(e) {
     // Clear signup form
     document.getElementById('signupForm').reset();
 }
-
-function loginAsRole(role) {
-    const user = users.find(u => u.role === role);
-    if (user) {
-        currentUser = user;
-        initializeApp();
-    }
-}
-
 function authenticateUser(username, password) {
     // Simple authentication (in production, use backend)
     const user = users.find(u => u.email === username || u.name === username);
@@ -348,7 +348,6 @@ function initializeApp() {
     switchSection('dashboard');
     
     renderIngredients();
-    renderRecipes();
     
     // For stores manager, also render orders sections
     if (currentUser.role === 'stores') {
@@ -401,9 +400,15 @@ function buildNavMenu() {
 
 function switchSection(sectionId) {
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelector(`[data-section="${sectionId}"]`).classList.add('active');
+    const navBtn = document.querySelector(`[data-section="${sectionId}"]`);
+    if (navBtn) {
+        navBtn.classList.add('active');
+    }
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-    document.getElementById(sectionId).classList.add('active');
+    const section = document.getElementById(sectionId);
+    if (section) {
+        section.classList.add('active');
+    }
     
     if (sectionId === 'dashboard') renderDashboard();
     if (sectionId === 'ingredients') renderIngredients();
@@ -651,7 +656,7 @@ function renderIngredients() {
                     
                     <th style="padding: 16px; text-align: left; border-bottom: 2px solid rgba(255,255,255,0.1); white-space: nowrap;">Added By</th>
 
-                    ${currentUser.role === 'admin' ? '<th style="padding: 16px; text-align: center; border-bottom: 2px solid rgba(255,255,255,0.1); white-space: nowrap;">Actions</th>' : ''}
+                    ${['admin', 'hod', 'lecturer_incharge'].includes(currentUser.role) ? '<th style="padding: 16px; text-align: center; border-bottom: 2px solid rgba(255,255,255,0.1); white-space: nowrap;">Actions</th>' : ''}
                 </tr>
             </thead>
             <tbody>
@@ -666,7 +671,7 @@ function renderIngredients() {
                                 <strong>${ing.quantity}</strong> ${ing.unit}
                             </td>
                             <td style="padding: 16px; color: var(--text-secondary);">${ing.createdBy}</td>
-                            ${currentUser.role === 'admin' ? `
+                            ${['admin', 'hod', 'lecturer_incharge'].includes(currentUser.role) ? `
                                 <td style="padding: 16px; text-align: center;">
                                     <button class="btn-edit" onclick="editIngredient(${ing.id})" style="margin-right: 8px; padding: 6px 12px;">Edit</button>
                                     <button class="btn-delete" onclick="deleteIngredient(${ing.id})" style="padding: 6px 12px;">Delete</button>
@@ -681,16 +686,18 @@ function renderIngredients() {
 }
 
 function canEditIngredient(ingredient) {
-    // Training assistants no longer have edit rights here.
-    // Admins can edit any ingredient; Stores can edit if they created the item.
-    return currentUser.role === 'admin' ||
+    // Admins, HOD, and LIC can edit any ingredient; Stores can edit if they created the item.
+    return currentUser.role === 'admin' || 
+        currentUser.role === 'hod' ||
+        currentUser.role === 'lecturer_incharge' ||
         (currentUser.role === 'stores' && ingredient.createdBy === currentUser.name);
 }
 
 function canDeleteIngredient(ingredient) {
-    // Training assistants no longer have delete rights.
-    // Admins can delete any ingredient; Stores can delete if they created the item.
+    // Admins, HOD, and LIC can delete any ingredient; Stores can delete if they created the item.
     return currentUser.role === 'admin' ||
+        currentUser.role === 'hod' ||
+        currentUser.role === 'lecturer_incharge' ||
         (currentUser.role === 'stores' && ingredient.createdBy === currentUser.name);
 }
 
@@ -785,9 +792,10 @@ function addRecipe(e) {
     
     const name = document.getElementById('recipeName').value.trim();
     const servings = parseInt(document.getElementById('recipeServings').value);
+    const qualification = document.getElementById('recipeQualification').value;
 
-    if (!name || selectedRecipeIngredients.length === 0) {
-        alert('Please enter a recipe name and add at least one ingredient');
+    if (!name || selectedRecipeIngredients.length === 0 || !qualification) {
+        alert('Please enter a recipe name, select qualification level, and add at least one ingredient');
         return;
     }
 
@@ -796,9 +804,10 @@ function addRecipe(e) {
         name,
         ingredients: [...selectedRecipeIngredients],
         servings,
+        qualification,
         createdBy: currentUser.name,
         createdAt: new Date().toISOString(),
-        status: ['lecturer', 'training_assistant'].includes(currentUser.role) ? 'pending' : 'approved'
+        status: ['admin', 'hod', 'lecturer_incharge'].includes(currentUser.role) ? 'approved' : 'pending'
     };
 
     recipes.push(recipe);
@@ -833,6 +842,14 @@ function addRecipe(e) {
 }
 
 function deleteRecipe(id) {
+    const recipe = recipes.find(rec => rec.id === id);
+    if (!recipe) return;
+    
+    if (!canDeleteRecipe(recipe)) {
+        alert('You are not authorized to delete this recipe');
+        return;
+    }
+
     if (confirm('Delete this recipe?')) {
         recipes = recipes.filter(rec => rec.id !== id);
         saveToLocalStorage();
@@ -840,11 +857,27 @@ function deleteRecipe(id) {
     }
 }
 
+function canEditRecipe(recipe) {
+    return currentUser.role === 'admin' || 
+        currentUser.role === 'hod' ||
+        currentUser.role === 'lecturer_incharge' ||
+        currentUser.role === 'training_assistant';
+}
+
+function canDeleteRecipe(recipe) {
+    return currentUser.role === 'admin' ||
+        currentUser.role === 'hod' ||
+        currentUser.role === 'lecturer_incharge' ||
+        currentUser.role === 'training_assistant';
+}
+
+
+
 function editRecipe(id) {
     const recipe = recipes.find(rec => rec.id === id);
     if (!recipe) return;
 
-    if (currentUser.role !== 'training_assistant') {
+    if (!canEditRecipe(recipe)) {
         alert('You are not authorized to edit this recipe');
         return;
     }
@@ -852,6 +885,7 @@ function editRecipe(id) {
     document.getElementById('recipeForm').reset();
     document.getElementById('recipeName').value = recipe.name;
     document.getElementById('recipeServings').value = recipe.servings;
+    document.getElementById('recipeQualification').value = recipe.qualification || '';
     
     selectedRecipeIngredients = [...recipe.ingredients];
     renderRecipeIngredientsDisplay();
@@ -870,9 +904,10 @@ function editRecipe(id) {
 function updateRecipe(id) {
     const name = document.getElementById('recipeName').value.trim();
     const servings = parseInt(document.getElementById('recipeServings').value);
+    const qualification = document.getElementById('recipeQualification').value;
 
-    if (!name || selectedRecipeIngredients.length === 0) {
-        alert('Please enter a recipe name and add at least one ingredient');
+    if (!name || selectedRecipeIngredients.length === 0 || !qualification) {
+        alert('Please enter a recipe name, select qualification level, and add at least one ingredient');
         return;
     }
 
@@ -883,6 +918,7 @@ function updateRecipe(id) {
     recipe.name = name;
     recipe.ingredients = [...selectedRecipeIngredients];
     recipe.servings = servings;
+    recipe.qualification = qualification;
 
     saveToLocalStorage();
     renderRecipes();
@@ -1482,6 +1518,111 @@ function confirmReceiptOfGoods(orderId) {
     }
 }
 
+function editAndResubmitOrder(orderId) {
+    const order = ingredientOrders.find(o => o.id === orderId);
+    if (!order) return;
+    
+    const recipe = recipes.find(r => r.id === order.recipeId);
+    if (!recipe) return;
+    
+    document.getElementById('orderModalTitle').textContent = '✏️ Edit & Resubmit Requisition';
+    document.getElementById('orderRecipeId').value = order.recipeId;
+    document.getElementById('orderStudentCount').value = order.studentCount;
+    document.getElementById('orderLessonDate').value = order.lessonDate;
+    document.getElementById('orderNotes').value = order.notes || '';
+    
+    document.getElementById('orderRecipeName').textContent = recipe.name;
+    document.getElementById('orderBaseServings').textContent = recipe.servings;
+    document.getElementById('orderRecipeCreator').textContent = recipe.createdBy;
+    
+    const previewHTML = recipe.ingredients.map(ing => 
+        `<div style="background: rgba(0,255,200,0.1); padding: 8px 12px; border-radius: 4px; font-size: 12px;">${ing.name} <span style="color: var(--accent-vibrant); font-weight: 600;">${ing.quantity} ${ing.unit}</span></div>`
+    ).join('');
+    document.getElementById('orderIngredientsPreview').innerHTML = previewHTML;
+    
+    calculateOrderQuantitiesStatic();
+    
+    const orderForm = document.getElementById('orderForm');
+    const originalOnSubmit = orderForm.onsubmit;
+    orderForm.onsubmit = (e) => resubmitRejectedOrder(e, orderId, originalOnSubmit);
+    
+    const orderModal = document.getElementById('orderModal');
+    orderModal.classList.add('active');
+    orderModal.style.display = 'flex';
+    
+    const closeButtons = orderModal.querySelectorAll('.close-btn');
+    closeButtons.forEach(btn => {
+        btn.onclick = () => closeStaticOrderModal(orderModal, originalOnSubmit);
+    });
+    
+    const cancelBtn = document.getElementById('cancelOrder');
+    if (cancelBtn) {
+        cancelBtn.onclick = () => closeStaticOrderModal(orderModal, originalOnSubmit);
+    }
+}
+
+function closeStaticOrderModal(modal, originalOnSubmit) {
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
+    const orderForm = document.getElementById('orderForm');
+    if (originalOnSubmit !== undefined) {
+        orderForm.onsubmit = originalOnSubmit;
+    }
+}
+
+function resubmitRejectedOrder(e, orderId, originalOnSubmit) {
+    e.preventDefault();
+    
+    const order = ingredientOrders.find(o => o.id === orderId);
+    if (!order) return;
+    
+    const studentCount = parseInt(document.getElementById('orderStudentCount').value);
+    const lessonDate = document.getElementById('orderLessonDate').value;
+    const notes = document.getElementById('orderNotes').value.trim();
+    
+    if (!studentCount || !lessonDate) {
+        alert('Please enter number of students and lesson date');
+        return;
+    }
+    
+    const recipe = recipes.find(r => r.id === order.recipeId);
+    if (!recipe) return;
+    
+    order.studentCount = studentCount;
+    order.lessonDate = lessonDate;
+    order.notes = notes;
+    order.ingredients = recipe.ingredients.map(ing => ({
+        name: ing.name,
+        baseQuantity: ing.quantity,
+        baseUnit: ing.unit,
+        requiredQuantity: parseFloat(((ing.quantity / recipe.servings) * studentCount).toFixed(2)),
+        unit: ing.unit
+    }));
+    
+    order.status = 'pending_lic';
+    order.rejectionReason = null;
+    order.licRecommendation = null;
+    order.licRecommendedBy = null;
+    order.licRecommendedAt = null;
+    order.hodApproval = null;
+    order.hodApprovedBy = null;
+    order.hodApprovedAt = null;
+    order.resubmittedAt = new Date().toISOString();
+    
+    saveToLocalStorage();
+    
+    const orderModal = document.getElementById('orderModal');
+    closeStaticOrderModal(orderModal, originalOnSubmit);
+    
+    renderMyOrders();
+    renderApprovals();
+    renderDashboard();
+    
+    alert(`✅ Order resubmitted successfully!\n\nRecipe: ${recipe.name}\nStudents: ${studentCount}\nDate: ${lessonDate}\n\nAwaiting LIC approval...`);
+}
+
 function renderMyOrders() {
     const container = document.getElementById('myOrdersContainer');
     
@@ -1531,7 +1672,15 @@ function renderMyOrders() {
                 html += `
                     <div class="order-card" style="margin-bottom: 15px; border-left: 4px solid ${statusColor};">
                         <div class="order-card-header">
-                            <h4>🍽️ ${order.recipeName}</h4>
+                            <div style="flex: 1;">
+                                <h4>🍽️ ${order.recipeName}</h4>
+                                <div style="display: flex; gap: 4px; margin-top: 6px; font-size: 11px;">
+                                    <span style="opacity: ${['pending_lic', 'pending_hod', 'approved', 'issued', 'collected'].includes(order.status) ? 1 : 0.3}; color: var(--accent-vibrant);">● LIC</span>
+                                    <span style="opacity: ${['pending_hod', 'approved', 'issued', 'collected'].includes(order.status) ? 1 : 0.3}; color: #ffa500;">● HOD</span>
+                                    <span style="opacity: ${['approved', 'issued', 'collected'].includes(order.status) ? 1 : 0.3}; color: #00f5b8;">● Store</span>
+                                    <span style="opacity: ${order.status === 'collected' ? 1 : 0.3}; color: #2ecc71;">● Received</span>
+                                </div>
+                            </div>
                             <span class="order-badge" style="background-color: ${statusColor}; color: white;">${order.status.replace('_', ' ').toUpperCase()}</span>
                         </div>
                         <div class="order-card-details">
@@ -1585,6 +1734,11 @@ function renderMyOrders() {
                             <button class="btn-primary" onclick="confirmReceiptOfGoods(${order.id})">✓ Confirm Receipt of Goods</button>
                         </div>
                         ` : ''}
+                        ${(order.status === 'rejected_lic' || order.status === 'rejected_hod') ? `
+                        <div class="order-card-actions">
+                            <button class="btn-primary" onclick="editAndResubmitOrder(${order.id})">✏️ Edit & Resubmit</button>
+                        </div>
+                        ` : ''}
                         ${order.status === 'collected' ? `
                         <div class="order-detail" style="background-color: #f0f8f0; padding: 10px; border-radius: 4px; margin-top: 10px;">
                             <span class="label">Received by:</span>
@@ -1635,6 +1789,7 @@ function loadFromLocalStorage() {
 
         if (Array.isArray(recipes)) {
             recipes.forEach(rec => {
+                if (!rec.qualification) rec.qualification = 'NC';
                 if (Array.isArray(rec.ingredients)) {
                     rec.ingredients.forEach(ri => {
                         if (ri && ri.unit === 'piece') ri.unit = 'each';
@@ -1751,6 +1906,7 @@ function initializeDemoUsers() {
                 name: 'Tomato Pasta',
                 course: 'main',
                 servings: 4,
+                qualification: 'ND',
                 status: 'approved',
                 createdBy: 'Dr. Johnson',
                 ingredients: [
@@ -1765,6 +1921,7 @@ function initializeDemoUsers() {
                 name: 'Garlic Butter Fish Pasta',
                 course: 'main',
                 servings: 4,
+                qualification: 'HND',
                 status: 'approved',
                 createdBy: 'Dr. Johnson',
                 ingredients: [
@@ -1782,6 +1939,7 @@ function initializeDemoUsers() {
                 name: 'Honey Glazed Chicken',
                 course: 'main',
                 servings: 4,
+                qualification: 'NC',
                 status: 'approved',
                 createdBy: 'Dr. Johnson',
                 ingredients: [
@@ -1801,6 +1959,7 @@ function initializeDemoUsers() {
                 name: 'Garlic Mashed Potatoes',
                 course: 'side',
                 servings: 4,
+                qualification: 'ND',
                 status: 'approved',
                 createdBy: 'Dr. Johnson',
                 ingredients: [
@@ -1817,6 +1976,7 @@ function initializeDemoUsers() {
                 name: 'Herb Rice Pilaf',
                 course: 'side',
                 servings: 5,
+                qualification: 'HND',
                 status: 'approved',
                 createdBy: 'Dr. Johnson',
                 ingredients: [
@@ -1833,6 +1993,7 @@ function initializeDemoUsers() {
                 name: 'Roasted Root Vegetables',
                 course: 'side',
                 servings: 4,
+                qualification: 'NC',
                 status: 'approved',
                 createdBy: 'Dr. Johnson',
                 ingredients: [
@@ -1851,6 +2012,7 @@ function initializeDemoUsers() {
                 name: 'Garlic Cheese Croutons',
                 course: 'appetizer',
                 servings: 4,
+                qualification: 'NC',
                 status: 'approved',
                 createdBy: 'Dr. Johnson',
                 ingredients: [
@@ -1866,6 +2028,7 @@ function initializeDemoUsers() {
                 name: 'Shrimp Satay with Peanut Sauce',
                 course: 'appetizer',
                 servings: 6,
+                qualification: 'ND',
                 status: 'approved',
                 createdBy: 'Dr. Johnson',
                 ingredients: [
@@ -1881,6 +2044,7 @@ function initializeDemoUsers() {
                 name: 'Vegetable Spring Rolls',
                 course: 'appetizer',
                 servings: 4,
+                qualification: 'HND',
                 status: 'approved',
                 createdBy: 'Dr. Johnson',
                 ingredients: [
@@ -1898,6 +2062,7 @@ function initializeDemoUsers() {
                 name: 'Chocolate Mousse',
                 course: 'dessert',
                 servings: 4,
+                qualification: 'ND',
                 status: 'approved',
                 createdBy: 'Dr. Johnson',
                 ingredients: [
@@ -1913,6 +2078,7 @@ function initializeDemoUsers() {
                 name: 'Lemon Vanilla Cake',
                 course: 'dessert',
                 servings: 6,
+                qualification: 'HND',
                 status: 'approved',
                 createdBy: 'Dr. Johnson',
                 ingredients: [
@@ -1929,6 +2095,7 @@ function initializeDemoUsers() {
                 name: 'Strawberry Tart',
                 course: 'dessert',
                 servings: 6,
+                qualification: 'NC',
                 status: 'approved',
                 createdBy: 'Dr. Johnson',
                 ingredients: [
@@ -1946,6 +2113,7 @@ function initializeDemoUsers() {
                 name: 'Chocolate Truffles',
                 course: 'confectionery',
                 servings: 12,
+                qualification: 'ND',
                 status: 'approved',
                 createdBy: 'Dr. Johnson',
                 ingredients: [
@@ -1960,6 +2128,7 @@ function initializeDemoUsers() {
                 name: 'Almond Brittle',
                 course: 'confectionery',
                 servings: 10,
+                qualification: 'HND',
                 status: 'approved',
                 createdBy: 'Dr. Johnson',
                 ingredients: [
@@ -1974,6 +2143,7 @@ function initializeDemoUsers() {
                 name: 'Vanilla Fudge',
                 course: 'confectionery',
                 servings: 8,
+                qualification: 'NC',
                 status: 'approved',
                 createdBy: 'Dr. Johnson',
                 ingredients: [
@@ -1991,6 +2161,7 @@ function initializeDemoUsers() {
                 name: 'Mojito',
                 course: 'cocktail',
                 servings: 1,
+                qualification: 'ND',
                 status: 'approved',
                 createdBy: 'Dr. Johnson',
                 ingredients: [
@@ -2005,6 +2176,7 @@ function initializeDemoUsers() {
                 name: 'Lime Ginger Refresher',
                 course: 'cocktail',
                 servings: 1,
+                qualification: 'HND',
                 status: 'approved',
                 createdBy: 'Dr. Johnson',
                 ingredients: [
@@ -2019,6 +2191,7 @@ function initializeDemoUsers() {
                 name: 'Honey Lemon Punch',
                 course: 'cocktail',
                 servings: 4,
+                qualification: 'NC',
                 status: 'approved',
                 createdBy: 'Dr. Johnson',
                 ingredients: [
@@ -2035,16 +2208,22 @@ function initializeDemoUsers() {
 
 // ===== LOGIN FUNCTION =====
 function loginAsRole(role) {
+    console.log('loginAsRole called with role:', role);
     loadFromLocalStorage();
     initializeDemoUsers();
     
     const user = users.find(u => u.role === role);
+    console.log('Found user:', user);
     if (user) {
         currentUser = user;
+        console.log('Current user set to:', currentUser);
         initializeApp();
         setupEventListeners();
         populateIngredientDatalist();
         populateRecipeIngredientDatalist();
+    } else {
+        console.error('No user found with role:', role);
+        console.log('Available users:', users);
     }
 }
 
@@ -2076,15 +2255,21 @@ function renderRecipes() {
     
     if (!grid) return;
     
-    const searchTerm = document.getElementById('recipeSearch')?.value.toLowerCase() || '';
-    const filterStatus = document.getElementById('recipeApprovalFilter')?.value || '';
-    const filterCourse = document.getElementById('recipeCourseFilter')?.value || '';
-    
-    // Hide create recipe button for lecturer role
-    const createRecipeBtn = document.getElementById('openRecipeModal');
-    if (createRecipeBtn && currentUser.role === 'lecturer') {
-        createRecipeBtn.style.display = 'none';
+    if (!recipes || recipes.length === 0) {
+        grid.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📖</div><h3>No recipes found</h3></div>`;
+        return;
     }
+    
+    const recipeSearch = document.getElementById('recipeSearch');
+    const recipeApprovalFilter = document.getElementById('recipeApprovalFilter');
+    const recipeCourseFilter = document.getElementById('recipeCourseFilter');
+    
+    const searchTerm = ((recipeSearch && recipeSearch.value) || '').toLowerCase();
+    const filterStatus = (recipeApprovalFilter && recipeApprovalFilter.value) || '';
+    const filterCourse = (recipeCourseFilter && recipeCourseFilter.value) || '';
+    
+    const canEdit = currentUser && ['admin', 'hod', 'lecturer_incharge'].includes(currentUser.role);
+    const canApprove = currentUser && ['admin', 'hod', 'lecturer_incharge'].includes(currentUser.role);
     
     let filtered = recipes.filter(rec => {
         const matchesSearch = rec.name.toLowerCase().includes(searchTerm);
@@ -2098,7 +2283,6 @@ function renderRecipes() {
         return;
     }
     
-    // Map course types to emoji
     const courseEmojis = {
         'appetizer': '🥒',
         'main': '🍽️',
@@ -2108,38 +2292,120 @@ function renderRecipes() {
         'cocktail': '🍹'
     };
     
-    grid.innerHTML = filtered.map(rec => `
-        <div class="recipe-card ${rec.status}" ${rec.status === 'approved' && currentUser.role === 'lecturer' ? `onclick="openOrderModal(${rec.id}); return false;" style="cursor: pointer;"` : ''}>
-            <div class="recipe-header">
-                <div class="recipe-title">${rec.name}</div>
-                
-                <div class="recipe-meta">
-                    <span>${courseEmojis[rec.course] || '📖'} ${rec.course ? rec.course.charAt(0).toUpperCase() + rec.course.slice(1) : 'Recipe'}</span>
-                    <span>🍽️ ${rec.servings} servings</span>
+    const qualifications = ['NC', 'ND', 'HND'];
+    const qualificationEmojis = { 'NC': '🎓', 'ND': '📚', 'HND': '🏆' };
+    const qualificationNames = { 'NC': 'National Certificate', 'ND': 'National Diploma', 'HND': 'Higher National Diploma' };
+    
+    const qualCounts = {};
+    qualifications.forEach(q => {
+        qualCounts[q] = filtered.filter(rec => (rec.qualification || 'NC') === q).length;
+    });
+    
+    const hasQualifications = qualifications.some(q => qualCounts[q] > 0);
+    
+    let tabsHtml = '';
+    let firstTab = true;
+    if (hasQualifications) {
+        tabsHtml += '<div class="recipe-tabs">';
+        qualifications.forEach((qual) => {
+            const count = qualCounts[qual];
+            if (count > 0) {
+                tabsHtml += `
+                    <button class="recipe-tab ${firstTab ? 'active' : ''}" data-qualification="${qual}" onclick="switchRecipeQualification('${qual}')">
+                        <span class="tab-emoji">${qualificationEmojis[qual]}</span>
+                        <span class="tab-label">${qual}</span>
+                        <span class="tab-count">${count}</span>
+                    </button>
+                `;
+                firstTab = false;
+            }
+        });
+        tabsHtml += '</div>';
+    }
+    
+    const tabsContainer = document.getElementById('recipeTabsContainer');
+    if (tabsContainer) {
+        tabsContainer.innerHTML = tabsHtml;
+    }
+    
+    let html = '';
+    html += '<div class="recipe-content">';
+    
+    let isFirstContent = true;
+    for (const qual of qualifications) {
+        const qualRecipes = filtered.filter(rec => (rec.qualification || 'NC') === qual);
+        
+        const shouldDisplay = isFirstContent && qualRecipes.length > 0;
+        html += `<div class="recipe-tab-content" id="tab-${qual}" ${shouldDisplay ? 'style="display: block;"' : 'style="display: none;"'}>`;
+        if (shouldDisplay) isFirstContent = false;
+        
+        if (qualRecipes.length === 0) {
+            html += `<div class="empty-state"><div class="empty-state-icon">📖</div><h3>No recipes found</h3></div>`;
+        } else {
+            html += `<div class="qualification-header">
+                <h3>${qualificationEmojis[qual]} ${qualificationNames[qual]}</h3>
+                <p class="qual-count">${qualRecipes.length} Recipe${qualRecipes.length !== 1 ? 's' : ''}</p>
+            </div>`;
+            html += '<div class="recipe-grid">';
+            
+            html += qualRecipes.map(rec => `
+                <div class="recipe-card ${rec.status}" ${rec.status === 'approved' && currentUser.role === 'lecturer' ? `onclick="openOrderModal(${rec.id}); return false;" style="cursor: pointer;"` : ''}>
+                    <div class="recipe-header">
+                        <div class="recipe-title">${rec.name}</div>
+                        <div class="recipe-meta">
+                            <span>${courseEmojis[rec.course] || '📖'} ${rec.course ? rec.course.charAt(0).toUpperCase() + rec.course.slice(1) : 'Recipe'}</span>
+                            <span>🍽️ ${rec.servings} servings</span>
+                        </div>
+                    </div>
+                    <div class="recipe-body">
+                        <div class="recipe-ingredients-list">
+                            <h4>Ingredients</h4>
+                            ${rec.ingredients.map(ing => `
+                                <div class="recipe-ingredient-item">${ing.name}: ${ing.quantity} ${ing.unit}</div>
+                            `).join('')}
+                        </div>
+                        ${rec.status === 'approved' && currentUser.role === 'lecturer' ? `<p style="font-size: 12px; color: var(--accent-vibrant); margin-top: 8px; font-weight: 600;">👆 Click to order ingredients</p>` : ''}
+                        <div class="recipe-card-actions">
+                            ${canEdit ? `
+                                <button class="btn-edit" onclick="editRecipe(${rec.id}); return false;">✏️ Edit</button>
+                                <button class="btn-delete" onclick="deleteRecipe(${rec.id}); return false;">🗑 Delete</button>
+                            ` : ''}
+                            ${rec.status === 'pending' && canApprove ? `
+                                <button class="btn-edit" onclick="approveRecipe(${rec.id}); return false;">✅ Approve</button>
+                                <button class="btn-delete" onclick="rejectRecipe(${rec.id}); return false;">❌ Reject</button>
+                            ` : ''}
+                            ${currentUser.role === 'training_assistant' ? `
+                                <button class="btn-edit" onclick="editRecipe(${rec.id}); return false;">✏️ Edit</button>
+                                <button class="btn-delete" onclick="deleteRecipe(${rec.id}); return false;">🗑 Delete</button>
+                            ` : ''}
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="recipe-body">
-                <div class="recipe-ingredients-list">
-                    <h4>Ingredients</h4>
-                    ${rec.ingredients.map(ing => `
-                        <div class="recipe-ingredient-item">${ing.name}: ${ing.quantity} ${ing.unit}</div>
-                    `).join('')}
-                </div>
-                ${rec.status === 'approved' && currentUser.role === 'lecturer' ? `<p style="font-size: 12px; color: var(--accent-vibrant); margin-top: 8px; font-weight: 600;">👆 Click to order ingredients</p>` : ''}
-                <div class="recipe-card-actions">
-                    ${rec.status === 'pending' && (currentUser.role === 'lecturer_incharge' || currentUser.role === 'admin') ? `
-                        <button class="btn-edit" onclick="approveRecipe(${rec.id}); return false;">✅ Approve</button>
-                        <button class="btn-delete" onclick="rejectRecipe(${rec.id}); return false;">❌ Reject</button>
-                    ` : ''}
-                    ${currentUser.role === 'training_assistant' ? `
-                        <button class="btn-edit" onclick="editRecipe(${rec.id}); return false;">✏️ Edit</button>
-                        <button class="btn-delete" onclick="deleteRecipe(${rec.id}); return false;">🗑 Delete</button>
-                    ` : ''}
-                    ${rec.createdBy === currentUser.name && rec.status === 'pending' && currentUser.role !== 'training_assistant' ? `<button class="btn-delete" onclick="deleteRecipe(${rec.id}); return false;">🗑 Delete</button>` : ''}
-                </div>
-            </div>
-        </div>
-    `).join('');
+            `).join('');
+            
+            html += '</div>';
+        }
+        
+        html += '</div>';
+    }
+    
+    html += '</div>';
+    
+    grid.innerHTML = html;
+}
+
+function switchRecipeQualification(qualification) {
+    document.querySelectorAll('.recipe-tab').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('.recipe-tab-content').forEach(content => content.style.display = 'none');
+    
+    const qualTab = document.querySelector(`[data-qualification="${qualification}"]`);
+    if (qualTab) {
+        qualTab.classList.add('active');
+    }
+    const tabContent = document.getElementById(`tab-${qualification}`);
+    if (tabContent) {
+        tabContent.style.display = 'block';
+    }
 }
 
 // ===== ORDER MODAL & SUBMISSION =====
@@ -2246,6 +2512,32 @@ function calculateOrderQuantities(recipeId) {
             display.textContent = `${requiredQty.toFixed(2)} ${ing.unit}`;
         }
     });
+}
+
+function calculateOrderQuantitiesStatic() {
+    const recipeId = parseInt(document.getElementById('orderRecipeId').value);
+    const recipe = recipes.find(r => r.id === recipeId);
+    if (!recipe) return;
+    
+    const studentCountInput = document.getElementById('orderStudentCount');
+    if (!studentCountInput) return;
+    
+    const studentCount = parseInt(studentCountInput.value) || 1;
+    
+    const quantitiesPreview = document.getElementById('orderQuantitiesPreview');
+    const html = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px;">
+            ${recipe.ingredients.map(ing => {
+                const multiplier = studentCount / recipe.servings;
+                const requiredQty = ing.quantity * multiplier;
+                return `<div style="background: rgba(0,212,255,0.1); border: 1px solid rgba(0,212,255,0.3); padding: 12px; border-radius: 6px;">
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">${ing.name}</div>
+                    <div style="font-size: 16px; font-weight: 600; color: var(--accent-vibrant);">${requiredQty.toFixed(2)} ${ing.unit}</div>
+                </div>`;
+            }).join('')}
+        </div>
+    `;
+    quantitiesPreview.innerHTML = html;
 }
 
 // ===== INVENTORY ADJUSTMENT FOR REQUISITIONS =====

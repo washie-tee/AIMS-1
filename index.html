@@ -185,7 +185,7 @@
                     <div class="search-filter">
                         <input type="text" id="recipeSearch" placeholder="Search recipes..." class="search-input">
                         <select id="recipeCourseFilter" class="filter-select">
-                            <option value="">All Courses</option>
+                            <option value="">All Menus</option>
                             <option value="appetizer">🥒 Appetizers</option>
                             <option value="main">🍽️ Main Courses</option>
                             <option value="side">🥗 Side Dishes</option>
@@ -200,6 +200,8 @@
                             <option value="rejected">Rejected</option>
                         </select>
                     </div>
+
+                    <div id="recipeTabsContainer"></div>
 
                     <div class="recipes-grid" id="recipesGrid">
                         <!-- Recipes will be added here -->
@@ -362,6 +364,15 @@
                     <label for="recipeServings">Base Servings</label>
                     <input type="number" id="recipeServings" min="1" required>
                 </div>
+                <div class="form-group">
+                    <label for="recipeQualification">Qualification Level</label>
+                    <select id="recipeQualification" required>
+                        <option value="">Select Qualification</option>
+                        <option value="NC">NC</option>
+                        <option value="ND">ND</option>
+                        <option value="HND">HND</option>
+                    </select>
+                </div>
                 
                 <div style="margin: 20px 0;">
                     <label style="display: block; margin-bottom: 10px; font-weight: 600;">Ingredients</label>
@@ -492,7 +503,7 @@
                 <!-- Order Details Section -->
                 <div class="form-group">
                     <label for="orderStudentCount">👥 Number of Students to Train <span style="color: var(--accent-secondary); font-weight: 600;">*</span></label>
-                    <input type="number" id="orderStudentCount" min="1" required placeholder="Enter student count" oninput="calculateOrderQuantities()">
+                    <input type="number" id="orderStudentCount" min="1" required placeholder="Enter student count" oninput="calculateOrderQuantitiesStatic()">
                     <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">System will automatically calculate ingredient quantities</div>
                 </div>
 
